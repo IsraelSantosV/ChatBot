@@ -72,7 +72,7 @@
 				<ChatMessage type='assistant' message={answer} />
 			{/if}
 			{#if loading}
-				<ChatMessage type='assistant' message="Processing..." />
+				<ChatMessage type='assistant' message="Carregando..." />
 			{/if}
 		</div>
 		<div class="" />
