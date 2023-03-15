@@ -1,59 +1,84 @@
-<script>
-	import Counter from './Counter.svelte';
-	import welcome from '$lib/images/svelte-welcome.webp';
-	import welcome_fallback from '$lib/images/svelte-welcome.png';
+<script lang="ts">
+	import ChatMessage from '$lib/components/ChatMessage.svelte'
+	import type { ChatCompletionRequestMessage } from 'openai'
+	import { SSE } from 'sse.js'
+
+	let query: string = ''
+	let answer: string = ''
+	let loading: boolean = false
+	let chatMessages: ChatCompletionRequestMessage[] = []
+	let scrollToDiv: HTMLDivElement
+
+	function scrollToBottom() {
+		setTimeout(function () {
+			scrollToDiv.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'nearest' })
+		}, 100)
+	}
+
+	const handleSubmit = async () => {
+		loading = true
+		chatMessages = [...chatMessages, { role: 'user', content: query }]
+		const eventSource = new SSE('/api/chat', {
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			payload: JSON.stringify({ messages: chatMessages })
+		})
+		query = ''
+		eventSource.addEventListener('error', handleError)
+		eventSource.addEventListener('message', (e) => {
+			scrollToBottom()
+			try {
+				loading = false
+				if (e.data === '[DONE]') {
+					chatMessages = [...chatMessages, { role: 'assistant', content: answer }]
+					answer = ''
+					return
+				}
+				const completionResponse = JSON.parse(e.data)
+				const [{ delta }] = completionResponse.choices
+				if (delta.content) {
+					answer = (answer ?? '') + delta.content
+				}
+			} catch (err) {
+				handleError(err)
+			}
+		})
+		eventSource.stream()
+		scrollToBottom()
+	}
+
+	function handleError<T>(err: T) {
+		loading = false
+		query = ''
+		answer = ''
+		console.error(err)
+	}
+
 </script>
 
-<svelte:head>
-	<title>Home</title>
-	<meta name="description" content="Svelte demo app" />
-</svelte:head>
-
-<section>
-	<h1>
-		<span class="welcome">
-			<picture>
-				<source srcset={welcome} type="image/webp" />
-				<img src={welcome_fallback} alt="Welcome" />
-			</picture>
-		</span>
-
-		to your new<br />SvelteKit app
-	</h1>
-
-	<h2>
-		try editing <strong>src/routes/+page.svelte</strong>
-	</h2>
-
-	<Counter />
-</section>
-
-<style>
-	section {
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		align-items: center;
-		flex: 0.6;
-	}
-
-	h1 {
-		width: 100%;
-	}
-
-	.welcome {
-		display: block;
-		position: relative;
-		width: 100%;
-		height: 0;
-		padding: 0 0 calc(100% * 495 / 2048) 0;
-	}
-
-	.welcome img {
-		position: absolute;
-		width: 100%;
-		height: 100%;
-		top: 0;
-		display: block;
-	}
-</style>
+<div class="flex flex-col pt-4 w-full px-8 items-center gap-2">
+	<div>
+		<h1 class="text-2xl font-bold w-full text-center">RachelAI</h1>
+		<p class="text-sm italic">Powered by gpt-3.5-turbo and Israel</p>
+	</div>
+	<div class="h-[500px] w-full bg-gray-900 rounded-md p-4 overflow-y-auto flex flex-col gap-4">
+		<div class="flex flex-col gap-2">
+			<ChatMessage type='assistant' message='Olá, Israel. Sou Rachel, sua assistente virtual. O que deseja?' />
+			{#each chatMessages as message}
+				<ChatMessage type={message.role} message={message.content} />
+			{/each}
+			{#if answer}
+				<ChatMessage type='assistant' message={answer} />
+			{/if}
+			{#if loading}
+				<ChatMessage type='assistant' message="Processing..." />
+			{/if}
+		</div>
+		<div class="" />
+	</div>
+	<form class="flex w-full rounded-md gap-4 bg-gray-900 p-4" on:submit|preventDefault={() => handleSubmit()} >
+		<input type="text" class="input input-bordered w-full" bind:value={query}/>
+		<button type="submit" class="btn btn-accent"> Enviar </button>
+	</form>
+</div>
