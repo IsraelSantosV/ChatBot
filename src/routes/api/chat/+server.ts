@@ -1,9 +1,9 @@
 import { OPENAI_KEY } from '$env/static/private'
 import { getTokens } from '$lib/tokenizer'
 import type { ChatCompletionRequestMessage, CreateChatCompletionRequest } from 'openai'
-import { json } from 'stream/consumers'
 import type { RequestHandler } from "./$types"
 import type { Config } from '@sveltejs/adapter-vercel'
+import { json } from '@sveltejs/kit'
 
 export const config: Config = {
     runtime: 'edge'
